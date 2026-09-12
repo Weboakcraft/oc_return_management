@@ -27,6 +27,7 @@ window.Views = {};
 var NAV = [
   { key: 'dashboard', label: 'Dashboard', route: 'dashboard', short: 'Home', icon: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' },
   { key: 'new-return', label: 'New return', route: 'new-return', short: 'New', icon: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 9v6M9 12h6"/>' },
+  { key: 'scan', label: 'Scan tracking IDs', route: 'scan', short: 'Scan', icon: '<path d="M4 5.5v13M7.4 5.5v13M10.6 5.5v13M14 5.5v13M17.2 5.5v13M20 5.5v13"/>' },
   { key: 'returns', label: 'Returns', route: 'returns', short: 'Returns', icon: '<path d="M21 8.2 12 3.3 3 8.2v7.6l9 4.9 9-4.9z"/><path d="M3 8.2l9 4.9 9-4.9M12 13.1V21"/>' },
   { key: 'pending', label: 'Pending', route: 'pending', short: 'Pending', icon: '<circle cx="12" cy="12" r="8.6"/><path d="M12 7v5.3l3.2 2"/>' },
   { key: 'repair', label: 'Repair', route: 'repair', short: 'Repair', icon: '<path d="M20.3 5.6a4.8 4.8 0 0 1-6 6L7.6 18.3a2.2 2.2 0 1 1-3.1-3.1l6.7-6.7a4.8 4.8 0 0 1 6-6l-2.9 2.9 2.1 2.1z"/>' },
@@ -35,6 +36,13 @@ var NAV = [
   { key: 'reports', label: 'Reports', route: 'reports', short: 'Reports', icon: '<path d="M13.8 3H7.2A2.2 2.2 0 0 0 5 5.2v13.6A2.2 2.2 0 0 0 7.2 21h9.6a2.2 2.2 0 0 0 2.2-2.2V8.2z"/><path d="M13.8 3v5.2H19M9 13h6M9 17h4"/>' },
   { key: 'admin', label: 'Admin', route: 'admin', short: 'Admin', icon: '<path d="M12 3.2 19 6v6c0 4.1-2.9 7.2-7 9-4.1-1.8-7-4.9-7-9V6z"/><path d="M9.3 12.2l1.9 1.9 3.5-3.6"/>' }
 ];
+
+/**
+ * Sections that belong to the phone rather than the backend. The permission
+ * list comes from the server and knows nothing about them, so they are added
+ * here; scanning writes to this device and needs no server permission.
+ */
+var LOCAL_NAV = ['scan'];
 
 var ICON_MORE = '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/>';
 
@@ -86,12 +94,19 @@ window.App = (function () {
     });
   }
 
+  /** The backend's list of sections, plus the ones this device owns. */
+  function allowedNav() {
+    var allowed = (STATE.permissions.nav || []).slice();
+    LOCAL_NAV.forEach(function (k) { if (allowed.indexOf(k) === -1) allowed.push(k); });
+    return allowed;
+  }
+
   /* ------------------------------------------------------------- chrome */
 
   function renderChrome() {
     var rail = U.$('#rail-nav');
     U.clear(rail);
-    var allowed = STATE.permissions.nav || [];
+    var allowed = allowedNav();
     NAV.filter(function (n) { return allowed.indexOf(n.key) > -1; }).forEach(function (n) {
       rail.appendChild(U.el('a', {
         class: 'rail__link', href: '#/' + n.route, 'data-nav': n.key
@@ -123,7 +138,7 @@ window.App = (function () {
     if (!bar) return;
     U.clear(bar);
 
-    var allowed = STATE.permissions.nav || [];
+    var allowed = allowedNav();
     var items = NAV.filter(function (n) { return allowed.indexOf(n.key) > -1; });
     if (!items.length) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
@@ -183,7 +198,7 @@ window.App = (function () {
       return Views.returns.detail(U.$('#view'), arg);
     }
 
-    var allowed = STATE.permissions.nav || [];
+    var allowed = allowedNav();
     if (allowed.indexOf(name) === -1) {
       name = allowed[0] || 'dashboard';
       location.hash = '#/' + name;
