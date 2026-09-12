@@ -13,6 +13,7 @@
     "apk:release": "npm run sync && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^6.0.1",
     "@capacitor/android": "^6.2.0",
     "@capacitor/core": "^6.2.0"
   },
