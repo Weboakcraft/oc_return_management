@@ -4,7 +4,7 @@
  */
 window.APP_CONFIG = {
   // Paste the Apps Script Web App /exec URL from Deploy > New deployment.
-  API_URL: 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE',
+  API_URL: 'https://script.google.com/macros/s/AKfycbxM41CRG_7KZDzFfhVkrpRxw6AkH9Gh154KdVb51fG1p72A2342h4tzrzhRx7ObkMra9g/exec',
 
   // Where the login page lives, relative to app.html.
   LOGIN_PAGE: 'index.html',
