@@ -7,7 +7,7 @@
  * queue at all. Bump CACHE_VERSION whenever you publish a frontend change.
  */
 
-var CACHE_VERSION = 'return-desk-v4';
+var CACHE_VERSION = 'return-desk-v5';
 
 var SHELL = [
   './',
