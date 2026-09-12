@@ -115,7 +115,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           ./gradlew --no-daemon assembleRelease \
-            -Pandroid.injected.signing.store.file=app/$KEYSTORE_PATH \
+            -Pandroid.injected.signing.store.file="$PWD/app/$KEYSTORE_PATH" \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
             -Pandroid.injected.signing.key.password=$KEY_PASSWORD
