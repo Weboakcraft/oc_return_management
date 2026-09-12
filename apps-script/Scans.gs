@@ -31,8 +31,9 @@ var SCANS_HEADERS = ['Scan_ID', 'Tracking_ID', 'Scanned_At', 'Scanned_By', 'Uplo
 
 /* ------------------------------------------------------------------ sheet */
 
-/** The bound spreadsheet, or the one named in CONFIG if the script is stand-alone. */
+/** The spreadsheet. The project's own getSS_() is used when it is there. */
 function scansBook_() {
+  if (typeof getSS_ === 'function') return getSS_();
   var book = SpreadsheetApp.getActiveSpreadsheet();
   if (book) return book;
   if (typeof CONFIG !== 'undefined' && CONFIG.SPREADSHEET_ID) {
@@ -183,24 +184,21 @@ function scansReply_(data, message) {
   return { success: true, data: data, message: message || '' };
 }
 
+/* bad() throws on its own in this project, so it is called, not thrown. */
 function scansFail_(message, code) {
-  if (typeof bad === 'function') throw bad(message, code || 'VALIDATION_ERROR');
+  if (typeof bad === 'function') bad(message, code || 'VALIDATION_ERROR');
   var e = new Error(message);
-  e.code = code || 'VALIDATION_ERROR';
+  e.errorCode = code || 'VALIDATION_ERROR';
   throw e;
 }
 
 /* ---------------------------------------------------------------- ROUTES
 
-Add these two to ROUTES in Code.gs, written the same way as the routes that
-are already there. If the existing entries look like this:
+These two live in ROUTES in Code.gs:
 
-    getPendingReturns: { fn: getPendingReturns, roles: ['ADMIN', 'RETURN_OPERATOR'] },
-
-then add:
-
-    saveScans: { fn: saveScans, roles: ['ADMIN', 'RETURN_OPERATOR', 'REPAIR_TEAM', 'PRODUCTION', 'MANAGEMENT'] },
-    getScans:  { fn: getScans,  roles: ['ADMIN', 'RETURN_OPERATOR', 'REPAIR_TEAM', 'PRODUCTION', 'MANAGEMENT'] },
+    // barcode scanning
+    saveScans: { fn: saveScans, roles: ALL_ROLES },
+    getScans: { fn: getScans, roles: ALL_ROLES },
 
 A route that is not in ROUTES is not reachable, and the app will say the
 spreadsheet side is not installed yet.
