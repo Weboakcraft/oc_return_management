@@ -220,7 +220,14 @@
 
 body.scan-open { overflow: hidden; }
 
-body.barcode-scanner-active { visibility: hidden; background: transparent !important; }
+/*
+ * visibility:hidden stops the page painting, but it does not touch the root
+ * element, and html carries a background of its own — that grey sheet was what
+ * covered the camera. Both have to go transparent for the preview to show.
+ */
+html.barcode-scanner-active,
+body.barcode-scanner-active { background: transparent !important; }
+body.barcode-scanner-active { visibility: hidden; }
 body.barcode-scanner-active .barcode-scanner-modal { visibility: visible; }
 
 .scan-overlay {
