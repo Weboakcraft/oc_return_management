@@ -209,3 +209,108 @@
 .ageing span { display: block; font-size: 12px; color: var(--muted); }
 .ageing b { font-family: var(--mono); font-size: 19px; font-weight: 500; }
 .ageing div.is-late b { color: var(--damage); }
+
+/* ============================================================
+   Barcode scanning
+   The overlay is the only thing on screen while the camera is
+   live. On Android the preview is drawn *behind* the WebView,
+   so the page hides itself and only .barcode-scanner-modal —
+   this overlay — stays visible.
+   ============================================================ */
+
+body.scan-open { overflow: hidden; }
+
+body.barcode-scanner-active { visibility: hidden; background: transparent !important; }
+body.barcode-scanner-active .barcode-scanner-modal { visibility: visible; }
+
+.scan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  padding: calc(10px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+}
+
+.scan-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+.scan-video.hidden { display: none; }
+
+.scan-top { position: relative; display: flex; align-items: center; gap: 12px; }
+.scan-top__count {
+  background: rgba(10, 30, 28, .72);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13.5px;
+}
+.scan-x {
+  margin-left: auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(10, 30, 28, .72);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* The viewfinder. The huge shadow spread is what dims everything outside it. */
+.scan-frame {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  max-width: 460px;
+  max-height: 300px;
+  align-self: center;
+  margin: 18px 0;
+  border: 2px solid rgba(255, 255, 255, .9);
+  border-radius: 14px;
+  box-shadow: 0 0 0 4000px rgba(0, 0, 0, .38);
+}
+.scan-line {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 2px;
+  border-radius: 2px;
+  background: #8fd0b4;
+  box-shadow: 0 0 10px rgba(143, 208, 180, .9);
+  animation: scan-sweep 2.2s ease-in-out infinite;
+}
+@keyframes scan-sweep {
+  0%, 100% { top: 10%; }
+  50% { top: 88%; }
+}
+
+.scan-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  min-height: 60px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(10, 30, 28, .78);
+}
+.scan-banner strong { font-family: var(--mono); font-size: 15px; word-break: break-all; }
+.scan-banner span { font-size: 12.5px; opacity: .88; }
+.scan-banner.is-ok { background: rgba(31, 122, 90, .94); }
+.scan-banner.is-bad { background: rgba(174, 54, 43, .96); }
+
+.scan-bottom { position: relative; display: flex; gap: 10px; }
+.scan-bottom .btn { flex: 1; min-height: 48px; }
+.scan-torch {
+  background: rgba(255, 255, 255, .14);
+  border-color: rgba(255, 255, 255, .34);
+  color: #fff;
+}
