@@ -117,20 +117,28 @@ window.U = (function () {
   /** Confirmation dialog for anything destructive or irreversible. */
   function confirm(opts) {
     return new Promise(function (resolve) {
-      var m = modal({
+      // The answer is recorded first and handed over in onClose, which every
+      // exit runs through — the buttons, the ✕, Escape and the backdrop. A
+      // promise settles once, so resolving inside the button handler as well
+      // would be the second call and would be thrown away: the dialog would
+      // then always read as Cancel, whatever was clicked.
+      var answer = false;
+      modal({
         title: opts.title || 'Confirm',
         body: el('p', { text: opts.message }),
         actions: [
-          { label: opts.cancelLabel || 'Cancel', onClick: function (close) { close(); resolve(false); } },
+          {
+            label: opts.cancelLabel || 'Cancel',
+            onClick: function (close) { answer = false; close(); }
+          },
           {
             label: opts.confirmLabel || 'Confirm',
             class: opts.danger ? 'btn--danger' : 'btn--primary',
-            onClick: function (close) { close(); resolve(true); }
+            onClick: function (close) { answer = true; close(); }
           }
         ],
-        onClose: function () { resolve(false); }
+        onClose: function () { resolve(answer); }
       });
-      return m;
     });
   }
 
