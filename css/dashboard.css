@@ -1,0 +1,211 @@
+/* ============================================================
+   Return Desk — dashboard and analytics
+   The lane strip is the one loud element: it reads the way the
+   floor works, left to right, received through to production.
+   Everything else stays quiet so the lane carries the meaning.
+   ============================================================ */
+
+.lane {
+  display: grid;
+  grid-template-columns: 1.15fr repeat(4, 1fr);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.lane__stage {
+  padding: 16px 18px 14px;
+  border-left: 1px solid var(--line);
+  position: relative;
+  min-width: 0;
+}
+.lane__stage:first-child { border-left: 0; background: var(--teal); color: #cfdcd8; }
+.lane__stage:first-child .lane__value { color: #fff; }
+.lane__stage:first-child .lane__label { color: #8fa9a4; }
+
+.lane__label { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.lane__value {
+  font-family: var(--mono);
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.lane__pct { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.lane__meter {
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.lane__meter i { display: block; height: 100%; border-radius: 2px; }
+.lane__stage--ok .lane__value { color: var(--ok); }
+.lane__stage--ok .lane__meter i { background: var(--ok); }
+.lane__stage--repair .lane__value { color: var(--repair); }
+.lane__stage--repair .lane__meter i { background: var(--repair); }
+.lane__stage--damage .lane__value { color: var(--damage); }
+.lane__stage--damage .lane__meter i { background: var(--damage); }
+.lane__stage--production .lane__value { color: var(--production); }
+.lane__stage--production .lane__meter i { background: var(--production); }
+.lane__note { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+
+.lane__stage:first-child .lane__sub {
+  font-size: 13px;
+  color: #a8c0bb;
+  margin-top: 8px;
+  font-family: var(--mono);
+}
+
+/* ------------------------------------------------------------- kpi tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.tile__label { font-size: 12.5px; color: var(--muted); }
+.tile__value {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 500;
+  margin-top: 6px;
+  line-height: 1;
+}
+.tile__sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.tile--action { cursor: pointer; }
+.tile--action:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.tile--warn .tile__value { color: var(--repair); }
+.tile--alert .tile__value { color: var(--damage); }
+
+/* ---------------------------------------------------------------- split */
+
+.split { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+.split--even { grid-template-columns: 1fr 1fr; }
+
+/* --------------------------------------------------------------- charts */
+
+.chart { width: 100%; display: block; }
+.chart text { font-family: var(--font); font-size: 11px; fill: var(--muted); }
+.chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .gridline { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
+.chart .bar-ok { fill: var(--ok); }
+.chart .bar-repair { fill: var(--repair); }
+.chart .bar-damage { fill: var(--damage); }
+.chart .bar-total { fill: var(--teal); }
+.chart .line-total { stroke: var(--teal); stroke-width: 2; fill: none; }
+.chart .dot { fill: var(--teal); }
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 0 16px 14px;
+}
+.chart-legend i {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+/* -------------------------------------------------------------- ranking */
+
+.rank { list-style: none; margin: 0; padding: 0; }
+.rank li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.rank li:last-child { border-bottom: 0; }
+.rank__name { font-size: 14px; }
+.rank__name .sku { font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: block; }
+.rank__qty { font-family: var(--mono); font-size: 15px; text-align: right; }
+.rank__bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 2px;
+  display: flex;
+  overflow: hidden;
+}
+.rank__bar i { height: 100%; display: block; }
+.rank__bar .ok { background: var(--ok); }
+.rank__bar .repair { background: var(--repair); }
+.rank__bar .damage { background: var(--damage); }
+
+/* ------------------------------------------------------------- timeline */
+
+.timeline { list-style: none; margin: 0; padding: 4px 0 4px 6px; }
+.timeline li {
+  position: relative;
+  padding: 0 0 18px 22px;
+  border-left: 2px solid var(--line);
+}
+.timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+}
+.timeline li.is-done::before { border-color: var(--ok); background: var(--ok); }
+.timeline__event { font-size: 14px; font-weight: 500; }
+.timeline__meta { font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+.timeline__note { font-size: 13px; color: var(--ink-soft); }
+
+/* ------------------------------------------------------- detail sections */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px 20px;
+}
+.detail-grid dt { font-size: 12.5px; color: var(--muted); }
+.detail-grid dd { margin: 3px 0 0; font-size: 14.5px; }
+.detail-grid dd.mono { font-size: 13.5px; }
+
+.qty-strip { display: flex; gap: 8px; flex-wrap: wrap; }
+.qty-chip {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  min-width: 84px;
+}
+.qty-chip span { display: block; font-size: 12px; color: var(--muted); }
+.qty-chip b { font-family: var(--mono); font-size: 19px; font-weight: 500; }
+.qty-chip--ok b { color: var(--ok); }
+.qty-chip--repair b { color: var(--repair); }
+.qty-chip--damage b { color: var(--damage); }
+.qty-chip--production b { color: var(--production); }
+
+/* --------------------------------------------------------- ageing strip */
+
+.ageing { display: flex; gap: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.ageing div {
+  flex: 1;
+  padding: 11px 12px;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+}
+.ageing div:first-child { border-left: 0; }
+.ageing span { display: block; font-size: 12px; color: var(--muted); }
+.ageing b { font-family: var(--mono); font-size: 19px; font-weight: 500; }
+.ageing div.is-late b { color: var(--damage); }

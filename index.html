@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Return Desk</title>
+<meta name="description" content="Return management for ecommerce operations.">
+<meta name="theme-color" content="#0e3b3c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/favicon.png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Return Desk">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/forms.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+<main class="login">
+  <section class="login__brand">
+    <div>
+      <h1>Every returned unit, accounted for.</h1>
+      <p>Returns come back in mixed condition. This is where each unit is counted, inspected and followed until it is either back on the shelf, repaired, or rebuilt.</p>
+    </div>
+
+    <div class="login__flow">
+      <div><span>01</span> Return received</div>
+      <div><span>02</span> Inspected</div>
+      <div><span>03</span> OK, repair or damaged</div>
+      <div><span>04</span> Repair or production</div>
+      <div><span>05</span> Completed</div>
+    </div>
+
+    <p class="small">Quantity is the unit of account throughout. Ten returns can hold twenty-seven units, and the difference matters.</p>
+  </section>
+
+  <section class="login__form-wrap">
+    <form class="login__form" id="login-form" autocomplete="on">
+      <h2>Sign in</h2>
+      <p>Use the account your administrator set up for you.</p>
+
+      <div id="login-error" class="login__error hidden" role="alert"></div>
+
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--block" id="login-btn">Sign in</button>
+
+      <div id="install-slot" class="hidden" data-button-class="btn btn--block" style="margin-top:10px"></div>
+
+      <div class="login__setup">
+        First time here? An administrator runs <span class="mono">setupDatabase()</span> in Apps Script, which creates the
+        <span class="mono">admin</span> account and prints its password once.
+      </div>
+    </form>
+  </section>
+</main>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/pwa.js"></script>
+<script>
+(function () {
+  // Already signed in? Go straight through.
+  if (Auth.session()) location.replace(APP_CONFIG.APP_PAGE);
+
+  var form = document.getElementById('login-form');
+  var errorBox = document.getElementById('login-error');
+  var button = document.getElementById('login-btn');
+
+  // A message left behind by an expired session.
+  try {
+    var notice = sessionStorage.getItem('returndesk.notice');
+    if (notice) {
+      errorBox.textContent = notice;
+      errorBox.classList.remove('hidden');
+      sessionStorage.removeItem('returndesk.notice');
+    }
+  } catch (e) { }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var username = document.getElementById('username').value.trim();
+    var password = document.getElementById('password').value;
+
+    if (!username || !password) {
+      show('Enter your username and password.');
+      return;
+    }
+
+    errorBox.classList.add('hidden');
+    U.busy(button, true);
+
+    Auth.signIn(username, password).then(function () {
+      location.href = APP_CONFIG.APP_PAGE;
+    }).catch(function (err) {
+      show(err.message);
+      U.busy(button, false);
+      document.getElementById('password').value = '';
+      document.getElementById('password').focus();
+    });
+  });
+
+  function show(message) {
+    errorBox.textContent = message;
+    errorBox.classList.remove('hidden');
+  }
+})();
+</script>
+</body>
+</html>

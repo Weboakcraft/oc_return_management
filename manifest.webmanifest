@@ -1,0 +1,58 @@
+{
+  "name": "Return Desk",
+  "short_name": "Return Desk",
+  "description": "Log returns, inspect them, track repair and production, and report on every unit.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "return-desk",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e3b3c",
+  "theme_color": "#0e3b3c",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New return",
+      "short_name": "New return",
+      "description": "Record a return that just came in",
+      "url": "./app.html#/new-return",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pending work",
+      "short_name": "Pending",
+      "description": "What is still open",
+      "url": "./app.html#/pending",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Repair queue",
+      "short_name": "Repair",
+      "description": "Units waiting to be fixed",
+      "url": "./app.html#/repair",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
