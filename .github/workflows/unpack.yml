@@ -74,6 +74,7 @@ jobs:
             fi
 
             rm -rf "$src/.git"
+            rm -rf "$src/.github"
             cp -a "$src"/. ./
 
             if [ -n "$keep_config" ]; then
