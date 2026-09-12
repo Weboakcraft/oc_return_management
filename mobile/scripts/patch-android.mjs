@@ -22,6 +22,11 @@
  *      Capacitor's has no camera preview in it. Writing a merged copy into the
  *      app module settles it, because an app resource beats every library.
  *
+ *   4. Scanner speed. The plugin will not report a barcode until it has read
+ *      the same value in ten separate camera frames. That is the pause people
+ *      feel when they hold a parcel up. Two frames is enough to rule out a
+ *      misread, so the threshold is lowered here.
+ *
  * Safe to run twice: anything already in place is left alone.
  */
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -34,6 +39,10 @@ const manifestPath = resolve(androidDir, 'app', 'src', 'main', 'AndroidManifest.
 const gradlePath = resolve(androidDir, 'app', 'build.gradle');
 const layoutDir = resolve(androidDir, 'app', 'src', 'main', 'res', 'layout');
 const layoutPath = resolve(layoutDir, 'bridge_layout_main.xml');
+const scannerJavaPath = resolve(
+  here, '..', 'node_modules', '@capacitor-mlkit', 'barcode-scanning', 'android', 'src', 'main',
+  'java', 'io', 'capawesome', 'capacitorjs', 'plugins', 'mlkit', 'barcodescanning', 'BarcodeScanner.java'
+);
 
 /* ---------------------------------------------------------------- manifest */
 
@@ -168,4 +177,38 @@ if (existingLayout === LAYOUT) {
   await writeFile(layoutPath, LAYOUT);
   console.log('bridge_layout_main.xml written into the app module:');
   console.log('  + preview_view for the barcode scanner, WebView on top');
+}
+
+/* ------------------------------------------------------- scanner patience */
+
+/*
+ * The plugin counts how many frames in a row carried the same value and only
+ * reports the barcode once that count reaches ten. On a label held steady that
+ * is roughly a second of staring before anything happens. Code 128 and the
+ * other shipping formats carry their own check digit, so a value that decodes
+ * identically twice is not a misread — two frames give the same protection and
+ * feel instant.
+ *
+ * This edits the plugin's source in node_modules, which Gradle compiles from
+ * directly. Both are recreated on every build, so nothing is left behind.
+ */
+const VOTES_FROM = /votes\s*>=\s*10\b/;
+const VOTES_TO = 'votes >= 2';
+
+try {
+  await access(scannerJavaPath);
+  let java = await readFile(scannerJavaPath, 'utf8');
+  if (java.includes(VOTES_TO)) {
+    console.log('Barcode plugin already reports on the second frame.');
+  } else if (VOTES_FROM.test(java)) {
+    java = java.replace(VOTES_FROM, VOTES_TO);
+    await writeFile(scannerJavaPath, java);
+    console.log('Barcode plugin patched:');
+    console.log('  + reports a barcode after 2 matching frames instead of 10');
+  } else {
+    console.warn('Note: the barcode plugin no longer has the 10-frame rule.');
+    console.warn('Nothing was changed. Check the plugin version if scanning feels slow.');
+  }
+} catch (e) {
+  console.warn('Could not reach the barcode plugin source: ' + e.message);
 }
