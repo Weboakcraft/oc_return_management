@@ -7,7 +7,7 @@
  * queue at all. Bump CACHE_VERSION whenever you publish a frontend change.
  */
 
-var CACHE_VERSION = 'return-desk-v3';
+var CACHE_VERSION = 'return-desk-v4';
 
 var SHELL = [
   './',
@@ -28,6 +28,7 @@ var SHELL = [
   './js/photos.js',
   './js/app.js',
   './js/dashboard.js',
+  './js/scan.js',
   './js/returns.js',
   './js/pending.js',
   './js/repair.js',
