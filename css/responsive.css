@@ -1,9 +1,14 @@
 /* ============================================================
    Return Desk — responsive
-   Warehouse staff work on phones, so below 900px the rail
-   becomes a drawer and every data table becomes stacked cards
-   with the label carried on each row via data-label.
+   Warehouse staff work on phones, so below 900px the sections
+   move into a bottom tab bar, the rail becomes a drawer holding
+   whatever did not fit, and every data table becomes stacked
+   cards with the label carried on each row via data-label.
    ============================================================ */
+
+/* The tab bar belongs to phones; on a desktop the rail does this job. */
+.tabbar { display: none; }
+.tabbar.hidden { display: none !important; }
 
 @media (max-width: 1180px) {
   .split, .split--even { grid-template-columns: 1fr; }
@@ -14,7 +19,62 @@
 }
 
 @media (max-width: 900px) {
-  :root { --topbar: 56px; }
+  :root { --topbar: 56px; --tabbar: 58px; }
+
+  /* ------------------------------------------------------- bottom tabs */
+
+  .tabbar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: var(--tabbar);
+    background: var(--teal);
+    border-top: 1px solid rgba(255, 255, 255, .12);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 34;
+  }
+  .tabbar__link {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: var(--tabbar);
+    padding: 6px 2px;
+    border: 0;
+    background: none;
+    color: #9fbab5;
+    font: inherit;
+    font-size: 10.5px;
+    line-height: 1.1;
+    letter-spacing: .01em;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar__text {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tabbar__link:active { background: rgba(255, 255, 255, .08); }
+  .tabbar__link.is-active { color: #fff; }
+  .tabbar__link.is-active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 18%;
+    right: 18%;
+    height: 2.5px;
+    border-radius: 0 0 3px 3px;
+    background: #8fd0b4;
+  }
 
   .rail {
     transform: translateX(-100%);
@@ -44,7 +104,8 @@
     z-index: 35;
   }
 
-  .view { padding: 14px; }
+  /* The bottom padding clears the fixed tab bar. */
+  .view { padding: 14px 14px calc(var(--tabbar) + 18px + env(safe-area-inset-bottom)); }
   .view__actions { width: 100%; }
   .view__actions .btn { flex: 1; }
 
@@ -103,12 +164,17 @@
   .login__brand h1 { font-size: 24px; }
   .login__flow { display: none; }
 
-  .toasts { left: 14px; right: 14px; bottom: 14px; max-width: none; }
+  .toasts {
+    left: 14px;
+    right: 14px;
+    bottom: calc(var(--tabbar) + 14px + env(safe-area-inset-bottom));
+    max-width: none;
+  }
 
   /* Sticky submit bar on the entry form */
   .sticky-actions {
     position: sticky;
-    bottom: 0;
+    bottom: calc(var(--tabbar) + env(safe-area-inset-bottom));
     background: var(--surface);
     border-top: 1px solid var(--line);
     padding: 12px 14px;
@@ -129,7 +195,7 @@
 }
 
 @media print {
-  .rail, .topbar, .view__actions, .filters, .pagination { display: none !important; }
+  .rail, .tabbar, .topbar, .view__actions, .filters, .pagination { display: none !important; }
   .main { margin-left: 0; }
   .panel { break-inside: avoid; border-color: #999; }
   body { background: #fff; }
