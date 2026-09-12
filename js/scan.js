@@ -389,6 +389,7 @@ Views.scan = (function () {
       .then(function (h) {
         if (!session) { try { h.remove(); } catch (e) { } return; }
         session.listener = h;
+        document.documentElement.classList.add('barcode-scanner-active');
         document.body.classList.add('barcode-scanner-active');
         return P.startScan();
       })
@@ -434,6 +435,7 @@ Views.scan = (function () {
     session = null;
     document.body.classList.remove('scan-open');
     document.body.classList.remove('barcode-scanner-active');
+    document.documentElement.classList.remove('barcode-scanner-active');
 
     if (s) {
       if (s.tick) clearInterval(s.tick);
