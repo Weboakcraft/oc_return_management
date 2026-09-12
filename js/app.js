@@ -19,17 +19,34 @@ window.STATE = {
 
 window.Views = {};
 
+/**
+ * The sections. `short` and `icon` are only used by the phone tab bar, where
+ * the four or five sections people touch all day sit in reach of a thumb and
+ * the rest stay one tap away under More.
+ */
 var NAV = [
-  { key: 'dashboard', label: 'Dashboard', route: 'dashboard' },
-  { key: 'new-return', label: 'New return', route: 'new-return' },
-  { key: 'returns', label: 'Returns', route: 'returns' },
-  { key: 'pending', label: 'Pending', route: 'pending' },
-  { key: 'repair', label: 'Repair', route: 'repair' },
-  { key: 'production', label: 'Production', route: 'production' },
-  { key: 'analytics', label: 'Analytics', route: 'analytics' },
-  { key: 'reports', label: 'Reports', route: 'reports' },
-  { key: 'admin', label: 'Admin', route: 'admin' }
+  { key: 'dashboard', label: 'Dashboard', route: 'dashboard', short: 'Home', icon: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' },
+  { key: 'new-return', label: 'New return', route: 'new-return', short: 'New', icon: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 9v6M9 12h6"/>' },
+  { key: 'returns', label: 'Returns', route: 'returns', short: 'Returns', icon: '<path d="M21 8.2 12 3.3 3 8.2v7.6l9 4.9 9-4.9z"/><path d="M3 8.2l9 4.9 9-4.9M12 13.1V21"/>' },
+  { key: 'pending', label: 'Pending', route: 'pending', short: 'Pending', icon: '<circle cx="12" cy="12" r="8.6"/><path d="M12 7v5.3l3.2 2"/>' },
+  { key: 'repair', label: 'Repair', route: 'repair', short: 'Repair', icon: '<path d="M20.3 5.6a4.8 4.8 0 0 1-6 6L7.6 18.3a2.2 2.2 0 1 1-3.1-3.1l6.7-6.7a4.8 4.8 0 0 1 6-6l-2.9 2.9 2.1 2.1z"/>' },
+  { key: 'production', label: 'Production', route: 'production', short: 'Prod', icon: '<path d="M3 20.5V10l5.5 3.4V10L14 13.4V7l6.5 3.9v9.6z"/><path d="M3 20.5h18"/>' },
+  { key: 'analytics', label: 'Analytics', route: 'analytics', short: 'Stats', icon: '<path d="M3.5 20.5h17"/><path d="M6.8 20.5v-6M12 20.5V5.5M17.2 20.5v-9"/>' },
+  { key: 'reports', label: 'Reports', route: 'reports', short: 'Reports', icon: '<path d="M13.8 3H7.2A2.2 2.2 0 0 0 5 5.2v13.6A2.2 2.2 0 0 0 7.2 21h9.6a2.2 2.2 0 0 0 2.2-2.2V8.2z"/><path d="M13.8 3v5.2H19M9 13h6M9 17h4"/>' },
+  { key: 'admin', label: 'Admin', route: 'admin', short: 'Admin', icon: '<path d="M12 3.2 19 6v6c0 4.1-2.9 7.2-7 9-4.1-1.8-7-4.9-7-9V6z"/><path d="M9.3 12.2l1.9 1.9 3.5-3.6"/>' }
 ];
+
+var ICON_MORE = '<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/>';
+
+/** Wraps icon path data in an SVG sized for the tab bar. */
+function navIcon(paths) {
+  return '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    paths + '</svg>';
+}
+
+/** How many slots the phone tab bar has, More included. */
+var TABS = 5;
 
 window.App = (function () {
 
@@ -92,6 +109,47 @@ window.App = (function () {
       who.appendChild(U.el('b', { text: STATE.user.name }));
       who.appendChild(U.el('span', { text: roleLabel(STATE.user.role) }));
     }
+
+    renderTabbar();
+  }
+
+  /**
+   * The phone tab bar. Everything the user is allowed to see goes in, up to
+   * the number of slots; if there are more sections than slots the last slot
+   * becomes More, which opens the full list.
+   */
+  function renderTabbar() {
+    var bar = U.$('#tabbar');
+    if (!bar) return;
+    U.clear(bar);
+
+    var allowed = STATE.permissions.nav || [];
+    var items = NAV.filter(function (n) { return allowed.indexOf(n.key) > -1; });
+    if (!items.length) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+
+    var overflow = items.length > TABS;
+    var shown = overflow ? items.slice(0, TABS - 1) : items;
+
+    shown.forEach(function (n) {
+      bar.appendChild(U.el('a', {
+        class: 'tabbar__link',
+        href: '#/' + n.route,
+        'data-tab': n.key,
+        html: navIcon(n.icon) + '<span class="tabbar__text">' + U.esc(n.short || n.label) + '</span>'
+      }));
+    });
+
+    if (overflow) {
+      bar.appendChild(U.el('button', {
+        type: 'button',
+        class: 'tabbar__link tabbar__more',
+        'data-tab': '__more',
+        'aria-label': 'More sections',
+        html: navIcon(ICON_MORE) + '<span class="tabbar__text">More</span>',
+        onclick: toggleRail
+      }));
+    }
   }
 
   function roleLabel(role) {
@@ -101,6 +159,14 @@ window.App = (function () {
   function setActiveNav(key) {
     U.$$('.rail__link').forEach(function (a) {
       a.classList.toggle('is-active', a.getAttribute('data-nav') === key);
+    });
+
+    // On the tab bar a section that lives under More lights up More instead.
+    var tabs = U.$$('.tabbar__link');
+    var onBar = tabs.some(function (t) { return t.getAttribute('data-tab') === key; });
+    tabs.forEach(function (t) {
+      var k = t.getAttribute('data-tab');
+      t.classList.toggle('is-active', k === key || (!onBar && k === '__more'));
     });
   }
 

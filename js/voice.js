@@ -1,31 +1,68 @@
 /**
  * voice.js — dictation for text fields.
  *
- * Uses the browser's own speech recognition, so nothing is sent to a server of
- * ours and there is no key to manage. Support is uneven: Chrome and Edge have
- * it, Firefox and iOS Safari do not, and an Android WebView does not either.
- * Where it is missing the microphone button simply never appears, and the field
- * behaves exactly as it always did.
+ * Two engines, picked automatically:
+ *
+ *   Browser  — the Web Speech API (Chrome and Edge). Nothing is sent to a
+ *              server of ours and there is no key to manage.
+ *   Android  — the packaged app runs inside a WebView, and a WebView has no
+ *              Web Speech API even though `webkitSpeechRecognition` appears to
+ *              exist; every attempt ends in "not-allowed". So inside the APK we
+ *              talk to Android's own recogniser through the Capacitor
+ *              SpeechRecognition plugin instead, and ask for the microphone
+ *              permission the proper way.
+ *
+ * Where neither engine exists the microphone button simply never appears and
+ * the field behaves exactly as it always did.
  */
 window.Voice = (function () {
 
   var Engine = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-  var active = null; // only one microphone at a time
+  var active = null;        // web engine currently listening
+  var nativeSession = null; // native session currently listening
 
-  /** The engine exists in this browser at all. */
-  function available() { return !!Engine; }
+  /* ------------------------------------------------------------- engines */
+
+  /** The Capacitor bridge, but only when we are really running natively. */
+  function bridge() {
+    var C = window.Capacitor;
+    if (!C) return null;
+    var isNative = typeof C.isNativePlatform === 'function' ? C.isNativePlatform() : !!C.isNative;
+    return isNative ? C : null;
+  }
+
+  /** The native plugin handle, looked up once and remembered. */
+  var nativePlugin = (function () {
+    var found, looked = false;
+    return function () {
+      if (looked) return found;
+      looked = true;
+      var C = bridge();
+      if (!C) return (found = null);
+      try {
+        found = typeof C.registerPlugin === 'function'
+          ? C.registerPlugin('SpeechRecognition')
+          : (C.Plugins || {}).SpeechRecognition || null;
+      } catch (e) { found = null; }
+      if (found && typeof found.start !== 'function') found = null;
+      return found;
+    };
+  })();
+
+  function available() { return !!Engine || !!nativePlugin(); }
 
   /**
-   * Recognition needs a secure context. `isSecureContext` is the right test:
+   * The web engine needs a secure context. `isSecureContext` is the right test:
    * checking for https alone wrongly excludes localhost and a file:// page
-   * opened straight from disk, both of which Chrome treats as secure.
+   * opened straight from disk, both of which Chrome treats as secure. The
+   * native engine does not care, so this only gates the web path.
    */
   function secure() {
     if (typeof window.isSecureContext === 'boolean') return window.isSecureContext;
     return location.protocol === 'https:' || location.hostname === 'localhost';
   }
 
-  function supported() { return available() && secure(); }
+  function supported() { return !!nativePlugin() || (!!Engine && secure()); }
 
   function language() {
     return (window.STATE && STATE.settings && STATE.settings.voiceLanguage) ||
@@ -40,14 +77,12 @@ window.Voice = (function () {
   /**
    * Builds a microphone button.
    * opts: { onText(finalText), onInterim(text), label }
-   * Returns null when the browser cannot do this, so callers can skip the UI.
+   * Returns null when the device cannot do this, so callers can skip the UI.
    */
   function button(opts) {
-    // No engine at all means no button: offering one that can never work is
-    // worse than the field simply being a field.
     if (!available()) return null;
 
-    var usable = secure();
+    var usable = !!nativePlugin() || secure();
     var btn = U.el('button', {
       type: 'button',
       class: 'mic' + (usable ? '' : ' is-blocked'),
@@ -57,20 +92,135 @@ window.Voice = (function () {
     });
 
     btn.addEventListener('click', function () {
+      if (btn.classList.contains('is-listening')) { stop(); return; }
       if (!usable) {
         U.toast('Dictation needs a secure page. It works on your published https site, ' +
           'but not over plain http.', 'warn');
         return;
       }
-      if (btn.classList.contains('is-listening')) { stop(); return; }
-      start(btn, opts);
+      if (nativePlugin()) startNative(btn, opts);
+      else start(btn, opts);
     });
 
     return btn;
   }
 
+  /* -------------------------------------------------------- native engine */
+
+  /**
+   * Android's recogniser, through the Capacitor plugin.
+   *
+   * With partialResults on, `start()` resolves straight away and the words
+   * arrive as `partialResults` events; the final pass arrives the same way and
+   * is then followed by a `listeningState` of "stopped". So we keep the latest
+   * text we heard and hand it over once listening ends.
+   */
+  function startNative(btn, opts) {
+    stop();
+
+    var P = nativePlugin();
+    var heard = '';
+    var done = false;
+    var handles = [];
+    var timer = null;
+    var session = {};
+
+    btn.classList.add('is-listening');
+    btn.setAttribute('aria-label', 'Listening. Tap to stop.');
+    var hint = showHint(btn, 'Listening…');
+
+    session.stop = function () {
+      try { P.stop(); } catch (e) { }
+      setTimeout(function () { finish(); }, 300);
+    };
+    nativeSession = session;
+
+    function keep(data) {
+      var text = data && data.matches && data.matches[0];
+      if (!text) return;
+      heard = text;
+      if (opts.onInterim) opts.onInterim(text);
+      if (hint) hint.textContent = text;
+    }
+
+    function cleanup() {
+      btn.classList.remove('is-listening');
+      btn.setAttribute('aria-label', opts.label || 'Dictate');
+      if (hint) { hint.remove(); hint = null; }
+      if (timer) { clearTimeout(timer); timer = null; }
+      handles.forEach(function (h) { try { if (h && h.remove) h.remove(); } catch (e) { } });
+      handles = [];
+      try { P.removeAllListeners(); } catch (e) { }
+      if (nativeSession === session) nativeSession = null;
+    }
+
+    /** Ends the session. A message means something went wrong; say that instead. */
+    function finish(message, tone) {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (message) { U.toast(message, tone || 'error'); return; }
+      var text = heard.trim();
+      if (text) opts.onText(text);
+      else U.toast('Nothing was picked up. Try again, or type the name.', 'warn');
+    }
+
+    Promise.resolve()
+      .then(function () { return P.available ? P.available() : { available: true }; })
+      .then(function (a) {
+        if (a && a.available === false) throw new Error('__unavailable__');
+        return P.checkPermissions ? P.checkPermissions() : null;
+      })
+      .then(function (state) {
+        if (state && state.speechRecognition === 'granted') return state;
+        return P.requestPermissions ? P.requestPermissions() : { speechRecognition: 'granted' };
+      })
+      .then(function (state) {
+        if (state && state.speechRecognition && state.speechRecognition !== 'granted') {
+          throw new Error('__denied__');
+        }
+        return Promise.all([
+          P.addListener('partialResults', keep),
+          P.addListener('listeningState', function (s) {
+            if (s && s.status === 'stopped') setTimeout(function () { finish(); }, 300);
+          })
+        ]);
+      })
+      .then(function (hs) {
+        handles = hs || [];
+        if (done) return null;
+        // A safety net: if the recogniser never reports back, close the session.
+        timer = setTimeout(function () { try { P.stop(); } catch (e) { } }, 15000);
+        return P.start({
+          language: language(),
+          maxResults: 3,
+          partialResults: true,
+          popup: false
+        });
+      })
+      .then(function (res) {
+        // Only reached when the plugin returns the matches directly.
+        if (res && res.matches && res.matches.length) { keep(res); finish(); }
+      })
+      .catch(function (e) {
+        var code = (e && e.message) || '';
+        if (code === '__denied__') {
+          finish('Microphone permission is off for this app. Open Settings → Apps → ' +
+            'Return Desk → Permissions and allow Microphone.', 'error');
+        } else if (code === '__unavailable__') {
+          finish('This phone has no speech recognition service installed. Type the name instead.', 'warn');
+        } else if (/no match|didn.t catch/i.test(code)) {
+          finish('Nothing was picked up. Try again, a little closer to the microphone.', 'warn');
+        } else {
+          finish('Dictation could not start. ' + (code || 'Try again in a moment.'), 'error');
+        }
+      });
+  }
+
+  /* ----------------------------------------------------------- web engine */
+
   function start(btn, opts) {
-    stop(); // whatever was listening, stop it first
+    stop();
 
     var rec = new Engine();
     rec.lang = language();
@@ -100,8 +250,8 @@ window.Voice = (function () {
       settled = true;
       finish();
       var messages = {
-        'not-allowed': 'Microphone access was blocked. Allow it in the browser address bar, then try again.',
-        'service-not-allowed': 'Microphone access was blocked for this site.',
+        'not-allowed': 'Microphone access was blocked. Allow the microphone for this app, then try again.',
+        'service-not-allowed': 'Microphone access was blocked for this app.',
         'no-speech': 'Nothing was picked up. Try again, a little closer to the microphone.',
         'audio-capture': 'No microphone was found on this device.',
         'network': 'Speech recognition needs a connection and could not reach the service.',
@@ -138,6 +288,12 @@ window.Voice = (function () {
   }
 
   function stop() {
+    if (nativeSession) {
+      var s = nativeSession;
+      nativeSession = null;
+      s.stop();
+      return;
+    }
     if (!active) return;
     try { active.abort(); } catch (e) { }
     active = null;
