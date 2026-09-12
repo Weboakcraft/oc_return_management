@@ -56,6 +56,10 @@ jobs:
         working-directory: mobile
         run: npx cap add android
 
+      - name: Declare the camera and microphone permissions
+        working-directory: mobile
+        run: node scripts/patch-android.mjs
+
       - name: Generate launcher icons and splash screens
         working-directory: mobile
         run: npx @capacitor/assets generate --android --assetPath resources
