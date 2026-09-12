@@ -23,7 +23,7 @@
 Views.scan = (function () {
 
   var STORE = 'returndesk.scans';
-  var COOLDOWN_MS = 1800;   // the same code held in front of the lens is one scan
+  var COOLDOWN_MS = 2200;   // a code held in front of the lens counts once
   var UPLOAD_BATCH = 200;
 
   var state = { items: [], index: {} };
@@ -333,8 +333,13 @@ Views.scan = (function () {
     var id = String(code || '').trim();
     if (!id) return;
 
-    // The same label sitting in front of the lens fires again and again.
-    if (norm(id) === session.lastCode && now - session.lastAt < COOLDOWN_MS) return;
+    // A label sitting in front of the lens is reported over and over. The
+    // window slides while it stays there, so it counts once however long it is
+    // held; taking it away and bringing it back is what makes it a new scan.
+    if (norm(id) === session.lastCode && now - session.lastAt < COOLDOWN_MS) {
+      session.lastAt = now;
+      return;
+    }
     session.lastCode = norm(id);
     session.lastAt = now;
 
