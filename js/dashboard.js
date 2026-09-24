@@ -55,6 +55,7 @@ Views.dashboard = (function () {
 
     body.appendChild(lane(k));
     body.appendChild(pendingTiles(d.pending, k));
+    if (d.scans) body.appendChild(scanTiles(d.scans));
 
     var split = U.el('div', { class: 'split' });
     split.appendChild(trendPanel(d.trend));
@@ -114,6 +115,46 @@ Views.dashboard = (function () {
     tiles.appendChild(tile('Return transactions', k.returnTxns, 'separate returns in this period', '', function () { App.go('returns'); }));
 
     return tiles;
+  }
+
+  /* ----------------------------------------------------- scanned parcels */
+
+  /*
+   * Scans are tracking IDs only — no product, quantity or source — so they
+   * never enter the unit figures above. They get their own row instead, with
+   * the one number that needs action: parcels scanned whose return has not
+   * been entered yet (matched on Order ID = tracking ID).
+   */
+  function scanTiles(s) {
+    var wrap = U.el('div', {});
+    var tiles = U.el('div', { class: 'tiles' });
+    tiles.appendChild(tile('Parcels scanned', s.inRange, 'tracking IDs scanned in this period', '', function () { App.go('scan'); }));
+    tiles.appendChild(tile('Scanned today', s.today, 'tracking IDs scanned today', '', function () { App.go('scan'); }));
+    tiles.appendChild(tile('Scanned, return not entered', s.withoutReturn, 'no return with this tracking ID as Order ID',
+      s.withoutReturn > 0 ? 'warn' : '', Auth.can('canCreateReturn') ? function () { App.go('new-return'); } : null));
+    wrap.appendChild(tiles);
+
+    if (s.recentWithoutReturn && s.recentWithoutReturn.length) {
+      var panel = U.el('div', { class: 'panel', style: 'margin-bottom:16px' });
+      panel.appendChild(U.el('div', { class: 'panel__head' }, [
+        U.el('h2', { text: 'Scanned parcels waiting for a return entry' }),
+        U.el('span', { class: 'panel__note', text: 'Latest ' + s.recentWithoutReturn.length + ' of ' + s.withoutReturn })
+      ]));
+      var list = U.el('ul', { class: 'rank' });
+      s.recentWithoutReturn.forEach(function (r) {
+        list.appendChild(U.el('li', {}, [
+          U.el('div', { class: 'rank__name' }, [
+            document.createTextNode(r.trackingId),
+            U.el('span', { class: 'sku', text: (r.scannedBy || '') + (r.scannedAt ? ' · ' + r.scannedAt : '') })
+          ])
+        ]));
+      });
+      var body = U.el('div', { class: 'panel__body panel__body--flush' });
+      body.appendChild(list);
+      panel.appendChild(body);
+      wrap.appendChild(panel);
+    }
+    return wrap;
   }
 
   function tile(label, value, sub, kind, onClick, raw) {
