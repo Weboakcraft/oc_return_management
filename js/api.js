@@ -106,8 +106,9 @@ window.API = (function () {
       })
       .catch(function (err) {
         clearTimeout(timer);
+        // Checked first: a DOMException also carries a numeric .code.
+        if (err && err.name === 'AbortError') throw wrap('The server is taking too long. Check your connection and try again.', 'TIMEOUT');
         if (err && err.code) throw err;
-        if (err && err.name === 'AbortError') throw wrap('The request took too long. Check your connection and try again.', 'TIMEOUT');
         throw wrap('Could not reach the server. Check your internet connection.', 'NETWORK');
       });
   }
