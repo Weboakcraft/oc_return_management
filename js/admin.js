@@ -47,13 +47,8 @@ Views.admin = (function () {
   }
 
   function refreshMasters() {
-    return API.call('getBootstrap', {}).then(function (data) {
-      STATE.products = data.products;
-      STATE.sources = data.sources;
-      STATE.employees = data.employees;
-      STATE.statuses = data.statuses;
-      STATE.departments = data.departments;
-      STATE.settings = data.settings;
+    return API.call('getBootstrap', {}, { fresh: true }).then(function (data) {
+      App.setBootstrap(data);
     });
   }
 

@@ -7,13 +7,16 @@
  * queue at all. Bump CACHE_VERSION whenever you publish a frontend change.
  */
 
-var CACHE_VERSION = 'return-desk-v5';
+var CACHE_VERSION = 'return-desk-v6';
 
 var SHELL = [
   './',
   './index.html',
   './app.html',
   './manifest.webmanifest',
+  './css/fonts.css',
+  './assets/fonts/ibm-plex-sans-latin.woff2',
+  './assets/fonts/ibm-plex-mono-500-latin.woff2',
   './css/style.css',
   './css/forms.css',
   './css/dashboard.css',
@@ -71,7 +74,7 @@ self.addEventListener('fetch', function (event) {
   if (request.method !== 'GET') return;
 
   var url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;   // Apps Script, fonts: straight to network
+  if (url.origin !== self.location.origin) return;   // Apps Script: straight to network
 
   // Navigation: network first so a deployed update is picked up, cache as fallback.
   if (request.mode === 'navigate') {

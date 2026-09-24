@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Already signed in? Leave before the stylesheets and scripts load. The app
+// opens on this page every launch, so this saves a full page load each time.
+try {
+  var s = JSON.parse(localStorage.getItem('returndesk.session') || 'null');
+  if (s && s.token && s.expiresAt && new Date(String(s.expiresAt).replace(' ', 'T')) > new Date()) location.replace('app.html');
+} catch (e) { }
+</script>
 <title>Sign in · Return Desk</title>
 <meta name="description" content="Return management for ecommerce operations.">
 <meta name="theme-color" content="#0e3b3c">
@@ -12,9 +20,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Return Desk">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preload" href="assets/fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/forms.css">
 <link rel="stylesheet" href="css/responsive.css">

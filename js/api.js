@@ -20,11 +20,58 @@ window.API = (function () {
     return s ? s.token : '';
   }
 
+  /*
+   * Short-lived read cache.
+   *
+   * Every Apps Script round trip costs one to three seconds, and most of that
+   * is Google's own redirect and spin-up, not the work. Hopping from Returns to
+   * Pending and back used to pay it every time. Reads (get… / search…) are now
+   * kept for a short while and identical requests already on the wire are
+   * shared instead of sent twice. Any other action is a write, and a write
+   * empties the cache, so what this user changes is never shown stale.
+   */
+  var READ_TTL_MS = 30000;
+  var READ_MAX = 40;
+  var cache = {};           // key -> { at, data }
+  var inflight = {};        // key -> promise
+
+  function isRead(action) { return /^(get|search)/.test(action); }
+
+  function forget() { cache = {}; }
+
   /**
    * Calls one backend action.
    * Resolves with response.data, rejects with an Error carrying .code.
+   * opts.fresh skips the read cache (the answer is still stored for later).
    */
-  function call(action, payload) {
+  function call(action, payload, opts) {
+    if (!isRead(action)) {
+      forget();
+      return send(action, payload).then(function (data) { forget(); return data; });
+    }
+
+    var key = action + '|' + JSON.stringify(payload || {});
+    var hit = cache[key];
+    if (hit && !(opts && opts.fresh) && Date.now() - hit.at < READ_TTL_MS) {
+      return Promise.resolve(hit.data);
+    }
+    if (inflight[key]) return inflight[key];
+
+    var p = send(action, payload).then(function (data) {
+      delete inflight[key];
+      var keys = Object.keys(cache);
+      if (keys.length >= READ_MAX) delete cache[keys[0]];
+      cache[key] = { at: Date.now(), data: data };
+      return data;
+    }, function (err) {
+      delete inflight[key];
+      throw err;
+    });
+    inflight[key] = p;
+    return p;
+  }
+
+  function send(action, payload) {
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, window.APP_CONFIG.TIMEOUT_MS);
 
@@ -93,5 +140,5 @@ window.API = (function () {
       });
   }
 
-  return { call: call, login: login };
+  return { call: call, login: login, forget: forget };
 })();
