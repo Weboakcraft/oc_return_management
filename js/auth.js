@@ -28,6 +28,8 @@ window.Auth = (function () {
 
   function clear() {
     localStorage.removeItem(window.APP_CONFIG.STORE_KEY);
+    try { localStorage.removeItem('returndesk.bootstrap'); } catch (e) { }
+    if (window.API && API.forget) API.forget();
   }
 
   function session() { return read(); }

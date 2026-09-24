@@ -58,6 +58,50 @@ var TABS = 5;
 
 window.App = (function () {
 
+  /*
+   * Master data is cached on the phone. Opening the app used to sit on a
+   * skeleton until getBootstrap came back from Apps Script — two to four
+   * seconds on every launch before a single button worked. Now the last copy
+   * is drawn straight away and the fresh one replaces it when it lands. The
+   * copy belongs to the session token, so another sign-in never sees it.
+   */
+  var BOOT_KEY = 'returndesk.bootstrap';
+  var BOOT_MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+
+  function readBoot(token) {
+    try {
+      var c = JSON.parse(localStorage.getItem(BOOT_KEY) || 'null');
+      if (c && c.token === token && c.data && Date.now() - c.at < BOOT_MAX_AGE_MS) return c.data;
+    } catch (e) { }
+    return null;
+  }
+
+  function writeBoot(data) {
+    var s = Auth.session();
+    if (!s) return;
+    try { localStorage.setItem(BOOT_KEY, JSON.stringify({ token: s.token, at: Date.now(), data: data })); } catch (e) { }
+  }
+
+  function applyBootstrap(data, first) {
+    STATE.settings = data.settings || {};
+    STATE.products = data.products || [];
+    STATE.sources = data.sources || [];
+    STATE.employees = data.employees || [];
+    STATE.statuses = data.statuses || {};
+    STATE.departments = data.departments || [];
+    STATE.permissions = data.permissions || STATE.permissions;
+    STATE.user = data.user || STATE.user;
+    if (first) STATE.filters.range = STATE.settings.dashboardDefaultRange || 'this_month';
+  }
+
+  /** Stores fresh master data (from here or from Admin) and redraws the chrome. */
+  function setBootstrap(data) {
+    writeBoot(data);
+    applyBootstrap(data, false);
+    renderChrome();
+    setActiveNav(currentKey());
+  }
+
   function boot() {
     if (!Auth.requireSession()) return;
     var s = Auth.session();
@@ -65,24 +109,39 @@ window.App = (function () {
     STATE.permissions = s.permissions || { nav: [] };
     STATE.filters.range = 'this_month';
 
-    renderChrome();
-    U.skeleton(U.$('#view'), 5);
-
-    API.call('getBootstrap', {}).then(function (data) {
-      STATE.settings = data.settings || {};
-      STATE.products = data.products || [];
-      STATE.sources = data.sources || [];
-      STATE.employees = data.employees || [];
-      STATE.statuses = data.statuses || {};
-      STATE.departments = data.departments || [];
-      STATE.permissions = data.permissions || STATE.permissions;
-      STATE.user = data.user || STATE.user;
-      STATE.filters.range = STATE.settings.dashboardDefaultRange || 'this_month';
-
+    var started = false;
+    function start() {
+      if (started) return;
+      started = true;
       renderChrome();
       window.addEventListener('hashchange', route);
       route();
+    }
+
+    var cached = readBoot(s.token);
+    if (cached) {
+      applyBootstrap(cached, true);
+      start();
+    } else {
+      renderChrome();
+      U.skeleton(U.$('#view'), 5);
+    }
+
+    API.call('getBootstrap', {}, { fresh: true }).then(function (data) {
+      writeBoot(data);
+      if (!started) {
+        applyBootstrap(data, true);
+        start();
+        return;
+      }
+      var before = allowedNav().join(',');
+      applyBootstrap(data, false);
+      renderChrome();
+      // Only redraw the screen if what this user may see has changed.
+      if (allowedNav().join(',') !== before) route();
+      else setActiveNav(currentKey());
     }).catch(function (err) {
+      if (started) return;   // the cached copy is on screen and still usable
       U.clear(U.$('#view'));
       U.$('#view').appendChild(U.el('div', { class: 'panel' }, [
         U.el('div', { class: 'panel__body' }, [
@@ -92,6 +151,11 @@ window.App = (function () {
         ])
       ]));
     });
+  }
+
+  function currentKey() {
+    var name = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('/')[0];
+    return name === 'return' ? 'returns' : name;
   }
 
   /** The backend's list of sections, plus the ones this device owns. */
@@ -338,6 +402,6 @@ window.App = (function () {
   return {
     route: route, go: go, dateFilter: dateFilter, filterPayload: filterPayload,
     exportButton: exportButton, exportCurrent: exportCurrent, roleLabel: roleLabel,
-    setActiveNav: setActiveNav, closeRail: closeRail
+    setActiveNav: setActiveNav, closeRail: closeRail, setBootstrap: setBootstrap
   };
 })();

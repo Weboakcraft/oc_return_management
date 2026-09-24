@@ -1,0 +1,23 @@
+/*
+ * fonts.css — IBM Plex, served from this app instead of Google Fonts.
+ *
+ * The Google stylesheet was render-blocking: every launch waited on two
+ * requests to fonts.googleapis.com / fonts.gstatic.com before the first paint,
+ * which on a warehouse connection was seconds of white screen in the APK.
+ * These two files ship with the app, so the text draws immediately and works
+ * offline. Latin only — the app has no other script to show.
+ */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url(../assets/fonts/ibm-plex-sans-latin.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(../assets/fonts/ibm-plex-mono-500-latin.woff2) format('woff2');
+}

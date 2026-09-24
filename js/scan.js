@@ -26,6 +26,17 @@ Views.scan = (function () {
   var COOLDOWN_MS = 2200;   // a code held in front of the lens counts once
   var UPLOAD_BATCH = 200;
 
+  /*
+   * The barcode types a courier label can carry. Left unset, the scanner tries
+   * every format it knows on every frame — PDF417, Aztec and the rest — and
+   * each one costs time before it gives up. Naming the likely ones is the
+   * single biggest speed-up ML Kit offers.
+   */
+  var NATIVE_FORMATS = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'ITF',
+    'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'QR_CODE', 'DATA_MATRIX'];
+  var WEB_FORMATS = ['code_128', 'code_39', 'code_93', 'codabar', 'itf',
+    'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'data_matrix'];
+
   var state = { items: [], index: {} };
   var loaded = false;
   var session = null;       // the scanner while it is running
@@ -48,6 +59,7 @@ Views.scan = (function () {
   }
 
   function persist() {
+    if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
     try {
       localStorage.setItem(STORE, JSON.stringify({ v: 1, items: state.items }));
       return true;
@@ -57,7 +69,34 @@ Views.scan = (function () {
     }
   }
 
+  /*
+   * Writing the list means turning every scan so far into one string, which
+   * grows with the list. Doing that before the beep put a pause between the
+   * label and the confirmation that got longer all shift. The beep and the
+   * banner now go first and the write follows a moment later; scans that land
+   * together share one write. It is flushed when the app is backgrounded.
+   */
+  var persistTimer = null;
+
+  function persistSoon() {
+    if (persistTimer) return;
+    persistTimer = setTimeout(function () {
+      persistTimer = null;
+      if (!persist() && session) say('bad', 'Storage full', 'Upload the list and clear it');
+    }, 0);
+  }
+
+  function flush() { if (persistTimer) persist(); }
+
+  document.addEventListener('visibilitychange', function () { if (document.hidden) flush(); });
+  window.addEventListener('pagehide', flush);
+
   function pending() { return state.items.filter(function (s) { return !s.up; }); }
+  function pendingCount() {
+    var n = 0;
+    for (var i = 0; i < state.items.length; i++) if (!state.items[i].up) n++;
+    return n;
+  }
   function todayCount() {
     var d = U.today();
     return state.items.filter(function (s) { return String(s.at || '').slice(0, 10) === d; }).length;
@@ -65,9 +104,11 @@ Views.scan = (function () {
 
   /**
    * Saves one code. Returns 'saved', 'duplicate', 'empty' or 'full' — the
-   * caller turns that into the colour, the sound and the message.
+   * caller turns that into the colour, the sound and the message. With
+   * `later`, the write to storage is deferred (see persistSoon) and 'full'
+   * is reported on the scanner banner instead.
    */
-  function record(code) {
+  function record(code, later) {
     if (!loaded) load();
     var id = String(code || '').trim();
     if (!id) return 'empty';
@@ -81,6 +122,7 @@ Views.scan = (function () {
     };
     state.items.push(row);
     state.index[norm(id)] = true;
+    if (later) { persistSoon(); return 'saved'; }
     if (!persist()) {
       state.items.pop();
       delete state.index[norm(id)];
@@ -100,10 +142,21 @@ Views.scan = (function () {
 
   var audio = null;
 
-  function feedback(ok) {
+  /*
+   * Creating the audio context takes a noticeable moment on Android, which
+   * used to land on the first scan. It is made when the scanner opens — inside
+   * the tap, which is also what lets it play at all.
+   */
+  function warmAudio() {
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === 'suspended') audio.resume();
+    } catch (e) { }
+  }
+
+  function feedback(ok) {
+    try {
+      warmAudio();
       var osc = audio.createOscillator();
       var gain = audio.createGain();
       osc.connect(gain);
@@ -199,7 +252,7 @@ Views.scan = (function () {
     U.clear(host);
     [
       ['Total scanned', state.items.length, 'Everything saved on this phone'],
-      ['Waiting to upload', pending().length, 'Not yet in the spreadsheet'],
+      ['Waiting to upload', pendingCount(), 'Not yet in the spreadsheet'],
       ['Today', todayCount(), 'Scanned since midnight']
     ].forEach(function (t) {
       host.appendChild(U.el('div', { class: 'tile' }, [
@@ -211,7 +264,7 @@ Views.scan = (function () {
 
     var btn = U.$('#scan-upload');
     if (btn) {
-      var n = pending().length;
+      var n = pendingCount();
       btn.textContent = n ? 'Upload ' + n : 'Upload';
       btn.disabled = !n;
     }
@@ -343,7 +396,7 @@ Views.scan = (function () {
     session.lastCode = norm(id);
     session.lastAt = now;
 
-    var result = record(id);
+    var result = record(id, true);
     if (result === 'saved') {
       feedback(true);
       say('ok', id, 'Saved');
@@ -365,6 +418,7 @@ Views.scan = (function () {
       return;
     }
     session = { lastCode: '', lastAt: 0, native: !!nativePlugin(), torch: false, stopped: false };
+    warmAudio();
     buildOverlay();
     say('idle', 'Point the camera at a label', 'The scanner stays open for the next one');
     document.body.classList.add('scan-open');
@@ -375,13 +429,14 @@ Views.scan = (function () {
 
   function startNative() {
     var P = nativePlugin();
-    Promise.resolve()
-      .then(function () { return P.isSupported ? P.isSupported() : { supported: true }; })
-      .then(function (s) {
-        if (s && s.supported === false) throw new Error('__unsupported__');
-        return P.checkPermissions ? P.checkPermissions() : null;
-      })
-      .then(function (p) {
+    // The two checks are independent, so they cross the bridge together.
+    Promise.all([
+      P.isSupported ? P.isSupported() : { supported: true },
+      P.checkPermissions ? P.checkPermissions() : null
+    ])
+      .then(function (r) {
+        if (r[0] && r[0].supported === false) throw new Error('__unsupported__');
+        var p = r[1];
         if (p && p.camera === 'granted') return p;
         return P.requestPermissions ? P.requestPermissions() : { camera: 'granted' };
       })
@@ -396,7 +451,7 @@ Views.scan = (function () {
         session.listener = h;
         document.documentElement.classList.add('barcode-scanner-active');
         document.body.classList.add('barcode-scanner-active');
-        return P.startScan();
+        return P.startScan({ formats: NATIVE_FORMATS });
       })
       .catch(function (e) {
         var code = (e && e.message) || '';
@@ -411,23 +466,67 @@ Views.scan = (function () {
       });
   }
 
+  /** The formats this browser can read, narrowed to the label ones. Asked once. */
+  var webFormats = null;
+  function supportedWebFormats(Detector) {
+    if (webFormats) return Promise.resolve(webFormats);
+    var ask = typeof Detector.getSupportedFormats === 'function'
+      ? Detector.getSupportedFormats() : Promise.resolve([]);
+    return ask.then(function (have) {
+      webFormats = WEB_FORMATS.filter(function (f) { return have.indexOf(f) > -1; });
+      return webFormats;
+    }, function () { return (webFormats = []); });
+  }
+
   function startWeb() {
     var Detector = webDetector();
     var video = U.$('#scan-video');
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-      .then(function (stream) {
+    Promise.all([
+      navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: 'environment',
+          // Same reason as the app: dense 1D labels need more than 640x480.
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      }),
+      supportedWebFormats(Detector)
+    ])
+      .then(function (r) {
+        var stream = r[0];
         if (!session) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
         session.stream = stream;
         video.classList.remove('hidden');
         video.srcObject = stream;
         video.play();
-        var detector = new Detector();
-        session.tick = setInterval(function () {
-          if (!session || video.readyState < 2) return;
+        try {
+          var track = stream.getVideoTracks()[0];
+          var caps = track.getCapabilities ? track.getCapabilities() : {};
+          if (caps.focusMode && caps.focusMode.indexOf('continuous') > -1) {
+            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () { });
+          }
+        } catch (e) { }
+
+        var detector = r[1].length ? new Detector({ formats: r[1] }) : new Detector();
+        var busy = false;
+
+        // Decode as fast as the detector can go, one frame at a time, instead
+        // of a fixed 350 ms tick that left most frames unread.
+        function next() {
+          if (!session || session.stream !== stream) return;
+          if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(frame);
+          else session.raf = requestAnimationFrame(frame);
+        }
+        function frame() {
+          if (!session || session.stream !== stream) return;
+          if (busy || video.readyState < 2) { next(); return; }
+          busy = true;
           detector.detect(video).then(function (found) {
             if (found && found.length) handle(found[0].rawValue);
-          }).catch(function () { });
-        }, 350);
+          }).catch(function () { }).then(function () { busy = false; next(); });
+        }
+        next();
       })
       .catch(function (e) {
         stopScanning();
@@ -442,8 +541,10 @@ Views.scan = (function () {
     document.body.classList.remove('barcode-scanner-active');
     document.documentElement.classList.remove('barcode-scanner-active');
 
+    flush();
+
     if (s) {
-      if (s.tick) clearInterval(s.tick);
+      if (s.raf) cancelAnimationFrame(s.raf);
       if (s.stream) { try { s.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { } }
       if (s.listener) { try { s.listener.remove(); } catch (e) { } }
       var P = nativePlugin();

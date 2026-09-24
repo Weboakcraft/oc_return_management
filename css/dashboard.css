@@ -283,18 +283,23 @@ body.barcode-scanner-active .barcode-scanner-modal { visibility: visible; }
   box-shadow: 0 0 0 4000px rgba(0, 0, 0, .38);
 }
 .scan-line {
+  /* The box spans the sweep range and only its top border is drawn, so the
+     sweep is a transform the compositor runs on its own. Animating `top`
+     re-laid-out the page every frame, on the same CPU the barcode decoder
+     needs. */
   position: absolute;
   left: 8%;
   right: 8%;
-  height: 2px;
-  border-radius: 2px;
-  background: #8fd0b4;
-  box-shadow: 0 0 10px rgba(143, 208, 180, .9);
+  top: 10%;
+  height: 78%;
+  border-top: 2px solid #8fd0b4;
+  pointer-events: none;
+  will-change: transform;
   animation: scan-sweep 2.2s ease-in-out infinite;
 }
 @keyframes scan-sweep {
-  0%, 100% { top: 10%; }
-  50% { top: 88%; }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(100%); }
 }
 
 .scan-banner {

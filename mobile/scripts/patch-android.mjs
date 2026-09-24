@@ -27,6 +27,11 @@
  *      feel when they hold a parcel up. Two frames is enough to rule out a
  *      misread, so the threshold is lowered here.
  *
+ *   5. Scanner resolution. The plugin analyses 640x480 frames, too coarse for
+ *      the long, dense Code 128 on a courier label, so most frames fail to
+ *      decode until the phone is almost touching it. Frames are asked for at
+ *      1280x720 instead.
+ *
  * Safe to run twice: anything already in place is left alone.
  */
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -48,7 +53,10 @@ const scannerJavaPath = resolve(
 
 const PERMISSIONS = [
   'android.permission.CAMERA',
-  'android.permission.RECORD_AUDIO'
+  'android.permission.RECORD_AUDIO',
+  // navigator.vibrate() does nothing in the WebView without it, so the buzz
+  // that tells a good scan from a duplicate never happened in the APK.
+  'android.permission.VIBRATE'
 ];
 
 // Android 11 and up hide other apps unless they are asked for by name. The
@@ -195,20 +203,47 @@ if (existingLayout === LAYOUT) {
 const VOTES_FROM = /votes\s*>=\s*10\b/;
 const VOTES_TO = 'votes >= 2';
 
+/*
+ * The analysis stream is left at CameraX's default of 640x480. A courier AWB
+ * is a long Code 128 with thin bars; at that size a bar is often under two
+ * pixels wide and ML Kit cannot separate them, so the label only reads when
+ * the phone is held very close and very still. 1280x720 is what ML Kit
+ * recommends for barcodes and still runs every frame on a budget phone. The
+ * size is given in the screen's orientation, so portrait asks for 720x1280.
+ */
+const ANALYSIS_FROM = 'new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()';
+const ANALYSIS_TO = 'new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)' +
+  '.setTargetResolution(displaySize.x < displaySize.y ? new android.util.Size(720, 1280) : new android.util.Size(1280, 720))' +
+  '.build()';
+
 try {
   await access(scannerJavaPath);
   let java = await readFile(scannerJavaPath, 'utf8');
+  const original = java;
+
   if (java.includes(VOTES_TO)) {
     console.log('Barcode plugin already reports on the second frame.');
   } else if (VOTES_FROM.test(java)) {
     java = java.replace(VOTES_FROM, VOTES_TO);
-    await writeFile(scannerJavaPath, java);
     console.log('Barcode plugin patched:');
     console.log('  + reports a barcode after 2 matching frames instead of 10');
   } else {
     console.warn('Note: the barcode plugin no longer has the 10-frame rule.');
     console.warn('Nothing was changed. Check the plugin version if scanning feels slow.');
   }
+
+  if (java.includes('setTargetResolution')) {
+    console.log('Barcode plugin already analyses frames at 1280x720.');
+  } else if (java.includes(ANALYSIS_FROM)) {
+    java = java.replace(ANALYSIS_FROM, ANALYSIS_TO);
+    console.log('Barcode plugin patched:');
+    console.log('  + analyses camera frames at 1280x720 instead of 640x480');
+  } else {
+    console.warn('Note: the barcode plugin builds its camera stream differently now.');
+    console.warn('Resolution left at the default. Check the plugin version if labels read poorly.');
+  }
+
+  if (java !== original) await writeFile(scannerJavaPath, java);
 } catch (e) {
   console.warn('Could not reach the barcode plugin source: ' + e.message);
 }
